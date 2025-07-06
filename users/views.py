@@ -49,7 +49,7 @@ class UserLoginView(APIView):
 
         user = authenticate(username=username, password=password)
         if user is not None:
-            login(request, user)  # Аутентификация через Django
+            login(request, user)
             refresh = RefreshToken.for_user(user)
             logger.info(f"Пользователь {username} успешно вошел")
             return Response({
@@ -58,31 +58,3 @@ class UserLoginView(APIView):
             })
         logger.error(f"Неудачная попытка входа для {username}")
         return Response({"error": "Неверные учетные данные"}, status=HTTP_400_BAD_REQUEST)
-
-class GoogleLoginView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        if request.user.is_authenticated:
-            refresh = RefreshToken.for_user(request.user)
-            logger.info(f"Пользователь {request.user.username} вошел через Google")
-            return Response({
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            })
-        logger.error("Ошибка входа через Google: пользователь не аутентифицирован")
-        return Response({"error": "Ошибка аутентификации через Google"}, status=HTTP_400_BAD_REQUEST)
-
-class TelegramLoginView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        if request.user.is_authenticated:
-            refresh = RefreshToken.for_user(request.user)
-            logger.info(f"Пользователь {request.user.username} вошел через Telegram")
-            return Response({
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            })
-        logger.error("Ошибка входа через Telegram: пользователь не аутентифицирован")
-        return Response({"error": "Ошибка аутентификации через Telegram"}, status=HTTP_400_BAD_REQUEST)

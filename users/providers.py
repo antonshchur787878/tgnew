@@ -20,33 +20,8 @@ class TelegramProvider(OAuth2Provider):
             last_name=data.get('last_name'),
         )
 
-    def get_login_url(self, request, **kwargs):
-        # Используем маршрут, определенный в allauth.urls
-        return super().get_login_url(request, **kwargs)
+    def get_default_scope(self):
+        return []
 
-    def sociallogin_from_response(self, request, response):
-        from allauth.socialaccount.models import SocialLogin
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-        uid = str(response.get('id'))
-        extra_data = response
-
-        # Проверяем или создаем пользователя
-        user = User.objects.filter(username=extra_data.get('username')).first()
-        if not user:
-            user = User.objects.create_user(
-                username=extra_data.get('username'),
-                email='',  # Email не обязателен
-                first_name=extra_data.get('first_name'),
-                last_name=extra_data.get('last_name')
-            )
-            user.telegram_id = str(response.get('id'))  # Сохраняем telegram_id
-            user.save()
-
-        # Создаем SocialLogin
-        social_login = SocialLogin(user)
-        social_login.state = SocialLogin.state_from_request(request)
-        social_login.token = None
-        social_login.account.extra_data = extra_data
-        return social_login
+    def get_auth_params(self, request, action):
+        return {'bot_id': self.get_app(self.request).key}

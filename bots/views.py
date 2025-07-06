@@ -10,7 +10,7 @@ from .models import APIKey, Bot, LogEntry
 from .serializers import APIKeySerializer, BotSerializer
 from .utils import ExchangeAPI
 from .tasks import run_trading_strategy, stop_bot, log_action
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse  # Добавлен импорт HttpResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import get_user_model
@@ -310,44 +310,6 @@ class BotTestOrderView(APIView):
             )
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-class BotOrderHistoryView(APIView):
-    """
-    API для получения истории ордеров.
-    """
-    permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
-
-    def get_object(self, pk, user):
-        """
-        Получает бота по ID и проверяет права доступа.
-        """
-        try:
-            return Bot.objects.select_related('api_key').get(pk=pk, user=user)
-        except Bot.DoesNotExist:
-            logger.error(f"Бот ID {pk} не найден для пользователя {user.username}")
-            raise PermissionDenied("Bot not found or you do not have permission to access it")
-
-    def get(self, request, pk):
-        """
-        Получает историю ордеров бота.
-        """
-        logger.info(f"Пользователь {request.user.username} запрашивает историю ордеров для бота ID {pk}")
-        bot = self.get_object(pk, request.user)
-        decrypted_keys = bot.api_key.get_decrypted_keys()
-        try:
-            orders = ExchangeAPI.get_order_history(
-                exchange=bot.api_key.exchange,
-                api_key=decrypted_keys['api_key'],
-                api_secret=decrypted_keys['api_secret'],
-                symbol=bot.trading_pair.replace('/', '')
-            )
-            paginator = self.pagination_class()
-            page = paginator.paginate_queryset(orders, request)
-            return paginator.get_paginated_response(page)
-        except Exception as e:
-            logger.error(f"Ошибка получения истории ордеров для бота ID {pk}: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 class BotStatusView(APIView):
     """
     API для проверки статуса бота.
@@ -391,20 +353,9 @@ def telegram_login(request):
     logger.info(f"Пользователь пытается войти через Telegram: {request.GET}")
     return JsonResponse({'status': 'Telegram login not implemented yet'}, status=501)
 
-# Закомментирована функция google_callback, чтобы избежать конфликта с allauth
-# def google_callback(request):
-#     """
-#     Обработка callback после авторизации через Google и возврат JWT-токена.
-#     """
-#     logger.info(f"Обработка callback Google для пользователя: {request.user}")
-#     if request.user.is_authenticated:
-#         try:
-#             social_account = SocialAccount.objects.get(user=request.user, provider='google')
-#             refresh = RefreshToken.for_user(request.user)
-#             access_token = str(refresh.access_token)
-#             return redirect(f"http://localhost:3000/auth?token={access_token}")
-#         except SocialAccount.DoesNotExist:
-#             logger.error("Social account not found for Google callback")
-#             return JsonResponse({'error': 'Social account not found'}, status=400)
-#     logger.error("User not authenticated during Google callback")
-#     return JsonResponse({'error': 'User not authenticated'}, status=401)
+def telegram_login_test(request):
+    """
+    Тестовый маршрут для отладки авторизации через Telegram.
+    """
+    logger.info(f"Тестовый маршрут Telegram login: {request.GET}")
+    return HttpResponse("Telegram login test page. Please ensure your Telegram OAuth setup is correct.")

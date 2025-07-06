@@ -1,10 +1,15 @@
 from django.urls import path
 from .views import (
-    APIKeyListView, APIKeyDeleteView,
-    BotListCreateView, BotDetailView,
-    BotStartView, BotStopView,
-    BotTestOrderView, BotOrderHistoryView,
-    BotStatusView  # Добавляем новый view
+    APIKeyListView,
+    APIKeyDeleteView,
+    BotListCreateView,
+    BotDetailView,
+    BotStartView,
+    BotStopView,
+    BotTestOrderView,
+    BotStatusView,
+    test_error,
+    telegram_login,  # Сохраняем как заглушку, если нужно
 )
 
 urlpatterns = [
@@ -15,6 +20,7 @@ urlpatterns = [
     path('bots/<int:pk>/start/', BotStartView.as_view(), name='bot-start'),
     path('bots/<int:pk>/stop/', BotStopView.as_view(), name='bot-stop'),
     path('bots/<int:pk>/test-order/', BotTestOrderView.as_view(), name='bot-test-order'),
-    path('bots/<int:pk>/orders/', BotOrderHistoryView.as_view(), name='bot-order-history'),
-    path('bots/<int:pk>/status/', BotStatusView.as_view(), name='bot-status'),  # Новый маршрут
+    path('bots/<int:pk>/status/', BotStatusView.as_view(), name='bot-status'),
+    path('test-error/', test_error, name='test_error'),
+    # Убраны маршруты для Telegram, так как они обрабатываются allauth
 ]

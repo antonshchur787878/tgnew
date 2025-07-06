@@ -1,4 +1,3 @@
-# core/settings.py
 """
 Django settings for core project.
 
@@ -34,7 +33,8 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=True)  # Включено для разработки
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '10.77.77.50'])
+# Добавляем ngrok-URL в ALLOWED_HOSTS
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '10.77.77.50', 'bee7-109-87-213-171.ngrok-free.app'])
 
 # Application definition
 INSTALLED_APPS = [
@@ -49,11 +49,11 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',  # Поддержка Google
+    'allauth.socialaccount.providers.telegram',  # Поддержка Telegram
     'users',  # Для кастомного провайдера
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'bots',
-    'social_django',        # Для Telegram-аутентификации
     'webpack_loader',       # Для работы со статическими файлами React
     'csp',                  # Для управления Content Security Policy
 ]
@@ -88,23 +88,20 @@ AUTH_USER_MODEL = 'users.CustomUser'
 # Настройки аутентификации
 AUTHENTICATION_BACKENDS = (
     'allauth.account.auth_backends.AuthenticationBackend',  # Приоритет для allauth
-    'social_core.backends.google.GoogleOAuth2',
-    'social_core.backends.telegram.TelegramAuth',  # Telegram-аутентификация
-    'django.contrib.auth.backends.ModelBackend',
 )
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],  # Пустой, так как шаблоны больше не используются
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],  # Добавлено для поддержки шаблонов переводов
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'social_django.context_processors.backends',  # Для social_django
-                'social_django.context_processors.login_redirect',
+                'django.template.context_processors.i18n',  # Для поддержки переводов
             ],
         },
     },
@@ -148,6 +145,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'ru-ru'
+LANGUAGES = [
+    ('ru', 'Русский'),
+    ('en', 'English'),
+    ('uk', 'Українська'),
+]
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
@@ -192,7 +194,7 @@ REST_FRAMEWORK = {
 # Настройки Simple JWT
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15) if not DEBUG else timedelta(days=7),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1) if not DEBUG else timedelta(days=30),  # Исправлено с days30 на days=30
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1) if not DEBUG else timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
@@ -204,15 +206,10 @@ SIMPLE_JWT = {
 ENCRYPTION_KEY = env('ENCRYPTION_KEY')
 
 # Telegram bot settings
-TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN')
+TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='7615070961:AAEz_Ypvz96bK0iKfPCWfKuEahCOD7mEXy4')
 
-# Social Auth settings
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = env('SOCIAL_AUTH_GOOGLE_OAUTH2_KEY')
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = env('SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET')
-SOCIAL_AUTH_TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN')  # Используем для social_django
-
-# URL для редиректа после успешной аутентификации
-SOCIAL_AUTH_LOGIN_REDIRECT_URL = '/api/token/'
+# Social Auth settings (используем allauth)
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = '/dashboard/'
 SOCIAL_AUTH_LOGIN_ERROR_URL = '/login-error/'
 
 # Лимит времени ожидания для API-запросов
@@ -332,7 +329,7 @@ def get_git_commit_hash():
     try:
         return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], stderr=subprocess.DEVNULL).decode('ascii').strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return 'unknown'  # Обработка случая, когда Git не инициализирован
+        return 'unknown'
 
 sentry_sdk.init(
     dsn=env('SENTRY_DSN'),
@@ -344,7 +341,7 @@ sentry_sdk.init(
     traces_sample_rate=0.1 if not DEBUG else 1.0,
     debug=DEBUG,
     environment='development' if DEBUG else 'production',
-    release=get_git_commit_hash(),  # Включено для корректной работы Sentry
+    release=get_git_commit_hash(),
     send_client_reports=True
 )
 
@@ -369,25 +366,30 @@ ADMIN_INDEX_TITLE = "Welcome to Crypto Bot Admin"
 WEBPACK_LOADER = {
     'DEFAULT': {
         'CACHE': not DEBUG,
-        'BUNDLE_DIR_NAME': 'dist/',  # Указываем, что файлы должны быть в папке dist
+        'BUNDLE_DIR_NAME': 'dist/',
         'STATS_FILE': os.path.join(BASE_DIR, 'frontend', 'webpack-stats.json'),
         'POLL_INTERVAL': 0.1,
         'TIMEOUT': None,
-        'IGNORE': [r'.+\.hot-update\.js', r'.+\.map']  # Игнорируем HMR и карты
+        'IGNORE': [r'.+\.hot-update\.js', r'.+\.map']
     }
 }
 
 # Дополнительные настройки для allauth
-SITE_ID = 1  # Убедитесь, что в базе есть запись в таблице Site с id=1
-ACCOUNT_SIGNUP_FIELDS = []  # Пустой список, так как социальный вход не требует дополнительных полей
-SOCIALACCOUNT_AUTO_SIGNUP = True  # Автоматически создавать пользователя при входе
-SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'  # Отключаем проверку email (для разработки)
-SOCIALACCOUNT_EMAIL_REQUIRED = False  # Email не обязателен
-SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'  # Кастомный адаптер
-LOGIN_REDIRECT_URL = '/dashboard/'  # Куда перенаправлять после входа
-LOGOUT_REDIRECT_URL = '/'  # Куда перенаправлять после выхода
+SITE_ID = 1
+ACCOUNT_SIGNUP_FIELDS = []
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_EMAIL_REQUIRED = False
+SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/'
 
-# Настройки email (отключение отправки писем в консоль для разработки)
+# Настройки сессий
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 1209600
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Настройки email
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Настройки социальных провайдеров
@@ -396,19 +398,25 @@ SOCIALACCOUNT_PROVIDERS = {
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
         'APP': {
-            'client_id': env('SOCIAL_AUTH_GOOGLE_OAUTH2_KEY'),
-            'secret': env('SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET'),
+            'client_id': '89534307373-nqstau1sh3v0cogrkmkulgmp49qvfs74.apps.googleusercontent.com',
+            'secret': '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',
             'key': ''
-        }
+        },
+        'REDIRECT_URI': 'https://bee7-109-87-213-171.ngrok-free.app/accounts/google/login/callback/'  # Обновлено для ngrok
     },
     'telegram': {
         'APP': {
-            'client_id': '',  # Оставьте пустым
-            'secret': env('TELEGRAM_BOT_TOKEN'),  # Токен бота из .env
-            'key': ''  # Необязательно
+            'client_id': '@TradeGuardBot',  # Убедитесь, что это имя вашего бота
+            'secret': '7615070961:AAEz_Ypvz96bK0iKfPCWfKuEahCOD7mEXy4',
+            'key': ''
         },
         'AUTH_PARAMS': {
-            'auth_date_validity': 86400  # Время действия авторизации (24 часа)
+            'auth_date_validity': 86400
+        },
+        'SETTINGS': {
+            'AUTHORIZATION_URL': 'https://oauth.telegram.org/auth',
+            'ACCESS_TOKEN_URL': None,
+            'REDIRECT_URI': 'https://bee7-109-87-213-171.ngrok-free.app/accounts/telegram/login/callback/'  # Обновлено
         }
     }
 }
@@ -418,8 +426,8 @@ CONTENT_SECURITY_POLICY = {
     'DIRECTIVES': {
         'default-src': ("'self'",),
         'img-src': ("'self'", 'data:'),
-        'script-src': ("'self'", "'unsafe-eval'", 'https://accounts.google.com', 'https://*.google.com', 'https://telegram.org'),
+        'script-src': ("'self'", "'unsafe-eval'", 'https://accounts.google.com', 'https://*.google.com', 'https://telegram.org', 'https://api.telegram.org'),
         'style-src': ("'self'",),
-        'connect-src': ("'self'", 'https://o4509289022095360.ingest.de.sentry.io'),  # Для Sentry
+        'connect-src': ("'self'", 'https://o4509289022095360.ingest.de.sentry.io'),
     }
 }
